@@ -1,4 +1,8 @@
 <style>
+  *, *:before, *:after {
+    box-sizing: border-box;
+  }
+
   body {
     background: black;
     color: white;
@@ -33,6 +37,7 @@
     position: absolute;
     gap: 16px;
     padding: 16px;
+    width: 100%;
     z-index: 2;
   }
 
@@ -53,6 +58,10 @@
     transition: transform 200ms ease;
     object-fit: contain;
   }
+
+  .spacer {
+    width: 100%;
+  }
 </style>
 
 <div class="overlay">
@@ -66,9 +75,12 @@
     Rotate
   </button>
 
-  <!-- <button class="save-button">
+  <div class="spacer"></div>
+  
+  <button class="save-button">
+    <img src="download-simple-fill.svg">
     Download
-  </button> -->
+  </button>
 </div>
 
 <div class="container">
@@ -81,6 +93,7 @@
   }
 
   var rotateButton = document.querySelector(".rotate-button");
+  const downloadButton = document.querySelector('.save-button')
 
   var videoElement = document.querySelector("video");
   var videoSelect = document.querySelector("select#videoSource");
@@ -101,16 +114,51 @@
     videoElement.setAttribute("style", styles.join(""))
   })
 
+  downloadButton.addEventListener("click", async () => {
+    const videoSource = videoSelect.value;
+
+    const constraints = {
+      video: { deviceId: videoSource ? { exact: videoSource } : undefined },
+    };
+
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    if (!stream) return
+
+    const { width, height } = stream.getVideoTracks()[0].getSettings();
+
+    const canvas = document.createElement("canvas")
+    const context = canvas.getContext("2d")
+
+    canvas.width = width
+    canvas.height = height
+    
+    context.drawImage(videoElement, 0, 0, width, height)
+
+    const imageData = context.getImageData(0, 0, width, height)
+
+    for (let index = 0; index < imageData.data.length; index += 4) {
+      imageData.data[index] = 255 - imageData.data[index];
+      imageData.data[index + 1] = 255 - imageData.data[index + 1];
+      imageData.data[index + 2] = 255 - imageData.data[index + 2];
+    }
+
+    context.putImageData(imageData, 0, 0);
+
+    const link = document.createElement("a");
+    link.download = "filename.png";
+    link.href = canvas.toDataURL()
+    link.click();
+  })
+
   getStream().then(getDevices).then(gotDevices);
 
   function getDevices() {
-    // AFAICT in Safari this only gets default devices until gUM is called :/
     return navigator.mediaDevices.enumerateDevices();
   }
 
   function gotDevices(deviceInfos) {
-    window.deviceInfos = deviceInfos; // make available to console
-    console.log("Available input and output devices:", deviceInfos);
+    window.deviceInfos = deviceInfos;
+    
     for (const deviceInfo of deviceInfos) {
       const option = document.createElement("option");
       option.value = deviceInfo.deviceId;
@@ -128,6 +176,7 @@
         track.stop();
       });
     }
+
     const videoSource = videoSelect.value;
 
     const constraints = {
